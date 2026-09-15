@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 
 function App() {
   const [backendStatus, setBackendStatus] = useState("Verbinde mit Backend...")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadMessage, setUploadMessage] = useState("")
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/health")
@@ -14,6 +16,46 @@ function App() {
       })
   }, [])
 
+  const handleFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0] ?? null
+    setSelectedFile(file)
+    setUploadMessage("")
+  }
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      setUploadMessage("Bitte zuerst eine Datei auswählen.")
+      return
+    }
+
+    const formData = new FormData()
+    formData.append("file", selectedFile)
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/documents",
+        {
+          method: "POST",
+          body: formData,
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error("Upload fehlgeschlagen")
+      }
+
+      const data = await response.json()
+
+      setUploadMessage(
+        `Upload erfolgreich: ${data.filename} (${data.size} Bytes)`
+      )
+    } catch {
+      setUploadMessage("Upload fehlgeschlagen.")
+    }
+  }
+
   return (
     <div>
       <header>
@@ -24,8 +66,24 @@ function App() {
       <main>
         <section>
           <h2>Dokumente</h2>
-          <p>Noch keine Dokumente vorhanden.</p>
-          <button>Dokument hochladen</button>
+
+          <input
+            type="file"
+            accept=".pdf,.docx"
+            onChange={handleFileChange}
+          />
+
+          {selectedFile && (
+            <p>Ausgewählt: {selectedFile.name}</p>
+          )}
+
+          <button onClick={handleUpload}>
+            Dokument hochladen
+          </button>
+
+          {uploadMessage && (
+            <p>{uploadMessage}</p>
+          )}
         </section>
 
         <section>
