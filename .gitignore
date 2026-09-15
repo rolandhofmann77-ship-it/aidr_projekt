@@ -27,3 +27,6 @@ Thumbs.db
 # Project temporary files
 *.tmp
 *.log
+
+# Uploaded documents
+backend/uploads/

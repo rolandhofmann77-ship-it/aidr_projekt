@@ -4,6 +4,9 @@ function App() {
   const [backendStatus, setBackendStatus] = useState("Verbinde mit Backend...")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadMessage, setUploadMessage] = useState("")
+  const [extractedPages, setExtractedPages] = useState<
+    { page: number; text: string }[]
+  >([])
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/health")
@@ -20,8 +23,10 @@ function App() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0] ?? null
+
     setSelectedFile(file)
     setUploadMessage("")
+    setExtractedPages([])
   }
 
   const handleUpload = async () => {
@@ -47,6 +52,8 @@ function App() {
       }
 
       const data = await response.json()
+
+      setExtractedPages(data.pages ?? [])
 
       setUploadMessage(
         `Upload erfolgreich: ${data.filename} (${data.size} Bytes)`
@@ -85,6 +92,19 @@ function App() {
             <p>{uploadMessage}</p>
           )}
         </section>
+
+        {extractedPages.length > 0 && (
+          <section>
+            <h2>Extrahierter Text</h2>
+
+            {extractedPages.map((page) => (
+              <div key={page.page}>
+                <h3>Seite {page.page}</h3>
+                <pre>{page.text}</pre>
+              </div>
+            ))}
+          </section>
+        )}
 
         <section>
           <h2>Frage an die Dokumente</h2>
