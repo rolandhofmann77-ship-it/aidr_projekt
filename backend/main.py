@@ -3,8 +3,14 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
+from pydantic import BaseModel
+
+from backend.rag import answer_question
 
 app = FastAPI()
+
+class QuestionRequest(BaseModel):
+    question: str
 
 app.add_middleware(
     CORSMiddleware,
@@ -64,3 +70,7 @@ async def upload_document(file: UploadFile = File(...)):
         "size": len(content),
         "pages": pages,
     }
+
+@app.post("/ask")
+def ask_question(request: QuestionRequest):
+    return answer_question(request.question)

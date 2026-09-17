@@ -7,6 +7,11 @@ function App() {
   const [extractedPages, setExtractedPages] = useState<
     { page: number; text: string }[]
   >([])
+  const [question, setQuestion] = useState("")
+  const [answer, setAnswer] = useState("")
+  const [sources, setSources] = useState<
+    { document_id: number; page: number; distance: number }[]
+  >([])
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/health")
@@ -63,6 +68,39 @@ function App() {
     }
   }
 
+  const handleAsk = async () => {
+    if (!question.trim()) {
+      setAnswer("Bitte zuerst eine Frage eingeben.")
+      return
+    }
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/ask",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            question: question,
+          }),
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error("Frage konnte nicht verarbeitet werden")
+      }
+
+      const data = await response.json()
+
+      setAnswer(data.answer)
+      setSources(data.sources ?? [])
+    } catch {
+      setAnswer("Die Frage konnte nicht verarbeitet werden.")
+    }
+  }
+  
   return (
     <div>
       <header>
@@ -112,14 +150,39 @@ function App() {
           <input
             type="text"
             placeholder="Stelle eine Frage zu deinen Dokumenten..."
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
           />
 
-          <button>Frage stellen</button>
+          <button onClick={handleAsk}>
+            Frage stellen
+          </button>
         </section>
 
         <section>
           <h2>Antwort</h2>
-          <p>Hier wird später die Antwort der KI angezeigt.</p>
+
+          {answer ? (
+            <>
+              <p>{answer}</p>
+
+              {sources.length > 0 && (
+                <div>
+                  <h3>Quellen</h3>
+
+                  <ul>
+                    {sources.map((source, index) => (
+                      <li key={index}>
+                        Dokument {source.document_id} – Seite {source.page}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            <p>Noch keine Antwort vorhanden.</p>
+          )}
         </section>
 
         <section>
