@@ -1,11 +1,11 @@
 from pathlib import Path
-
+import os
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
+import psycopg
 from pydantic import BaseModel
-
-from backend.rag import answer_question
+from backend.rag import answer_question, embedding_model
 
 app = FastAPI()
 
@@ -55,7 +55,6 @@ def health_check():
 @app.post("/documents")
 async def upload_document(file: UploadFile = File(...)):
     file_path = UPLOAD_DIR / file.filename
-
     content = await file.read()
     file_path.write_bytes(content)
 
@@ -64,7 +63,54 @@ async def upload_document(file: UploadFile = File(...)):
     if file.content_type == "application/pdf":
         pages = extract_text_from_pdf(file_path)
 
+    with psycopg.connect(
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+    ) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO documents (filename, content_type)
+                VALUES (%s, %s)
+                RETURNING id
+                """,
+                (file.filename, file.content_type),
+            )
+
+            document_id = cursor.fetchone()[0]
+
+            for page in pages:
+                page_text = page["text"]
+
+                embedding = embedding_model.encode(page_text).tolist()
+
+                cursor.execute(
+                    """
+                    INSERT INTO document_chunks (
+                        document_id,
+                        chunk_index,
+                        content,
+                        page_number,
+                        embedding
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        document_id,
+                        page["page"] - 1,
+                        page_text,
+                        page["page"],
+                        embedding,
+                    ),
+                )
+
+        connection.commit()
+
     return {
+        "document_id": document_id,
         "filename": file.filename,
         "content_type": file.content_type,
         "size": len(content),
