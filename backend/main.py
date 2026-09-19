@@ -117,6 +117,75 @@ async def upload_document(file: UploadFile = File(...)):
         "pages": pages,
     }
 
+@app.get("/documents")
+def list_documents():
+    with psycopg.connect(
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+    ) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    filename,
+                    content_type,
+                    uploaded_at
+                FROM documents
+                ORDER BY uploaded_at DESC
+                """
+            )
+
+            documents = cursor.fetchall()
+
+    return [
+        {
+            "id": document[0],
+            "filename": document[1],
+            "content_type": document[2],
+            "uploaded_at": document[3],
+        }
+        for document in documents
+    ]
+
+@app.delete("/documents/{document_id}")
+def delete_document(document_id: int):
+    with psycopg.connect(
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+    ) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM documents
+                WHERE id = %s
+                RETURNING id, filename
+                """,
+                (document_id,),
+            )
+
+            deleted_document = cursor.fetchone()
+
+        connection.commit()
+
+    if deleted_document is None:
+        return {
+            "message": "Dokument nicht gefunden",
+            "document_id": document_id,
+        }
+
+    return {
+        "message": "Dokument gelöscht",
+        "document_id": deleted_document[0],
+        "filename": deleted_document[1],
+    }
+
 @app.post("/ask")
 def ask_question(request: QuestionRequest):
     return answer_question(request.question)

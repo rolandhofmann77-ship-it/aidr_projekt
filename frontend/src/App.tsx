@@ -12,6 +12,14 @@ function App() {
   const [sources, setSources] = useState<
     { document_id: number; page: number; distance: number }[]
   >([])
+  const [documents, setDocuments] = useState<
+    {
+      id: number
+      filename: string
+      content_type: string
+      uploaded_at: string
+    }[]
+  >([])
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/health")
@@ -21,6 +29,23 @@ function App() {
       })
       .catch(() => {
         setBackendStatus("Backend nicht erreichbar")
+      })
+  }, [])
+
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/documents")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Dokumente konnten nicht geladen werden")
+        }
+
+        return response.json()
+      })
+      .then((data) => {
+        setDocuments(data)
+      })
+      .catch(() => {
+        setDocuments([])
       })
   }, [])
 
@@ -65,6 +90,29 @@ function App() {
       )
     } catch {
       setUploadMessage("Upload fehlgeschlagen.")
+    }
+  }
+
+  const handleDeleteDocument = async (documentId: number) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/documents/${documentId}`,
+        {
+          method: "DELETE",
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error("Dokument konnte nicht gelöscht werden")
+      }
+
+      setDocuments((currentDocuments) =>
+        currentDocuments.filter(
+          (document) => document.id !== documentId
+        )
+      )
+    } catch {
+      alert("Dokument konnte nicht gelöscht werden.")
     }
   }
 
@@ -131,6 +179,30 @@ function App() {
           )}
         </section>
 
+        <section>
+          <h2>Meine Dokumente</h2>
+
+          {documents.length === 0 ? (
+            <p>Keine Dokumente vorhanden.</p>
+          ) : (
+            <ul>
+              {documents.map((document) => (
+                <li key={document.id}>
+                  <strong>{document.filename}</strong>
+                  {" – "}
+                  {new Date(document.uploaded_at).toLocaleString("de-DE")}
+                  {" "}
+                  <button
+                    onClick={() => handleDeleteDocument(document.id)}
+                  >
+                    Löschen
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        
         {extractedPages.length > 0 && (
           <section>
             <h2>Extrahierter Text</h2>
