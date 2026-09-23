@@ -1,10 +1,11 @@
 from pathlib import Path
 import os
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
 from docx import Document
 import psycopg
+from google.genai.errors import ServerError
 from pydantic import BaseModel
 from backend.rag import answer_question, embedding_model
 
@@ -309,7 +310,17 @@ def delete_document(document_id: int):
 
 @app.post("/ask")
 def ask_question(request: QuestionRequest):
-    return answer_question(
-        request.question,
-        request.document_id,
-    )
+    try:
+        return answer_question(
+            request.question,
+            request.document_id,
+        )
+
+    except ServerError:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Der KI-Dienst ist momentan nicht verfügbar. "
+                "Bitte versuchen Sie es in wenigen Sekunden erneut."
+            ),
+        )

@@ -155,16 +155,25 @@ function App() {
         }
       )
 
-      if (!response.ok) {
-        throw new Error("Frage konnte nicht verarbeitet werden")
-      }
-
       const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ?? "Frage konnte nicht verarbeitet werden."
+        )
+      }
 
       setAnswer(data.answer)
       setSources(data.sources ?? [])
-    } catch {
-      setAnswer("Die Frage konnte nicht verarbeitet werden.")
+
+    } catch (error) {
+      if (error instanceof Error) {
+        setAnswer(error.message)
+      } else {
+        setAnswer("Frage konnte nicht verarbeitet werden.")
+      }
+
+      setSources([])
     }
   }
   
