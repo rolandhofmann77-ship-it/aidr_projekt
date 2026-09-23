@@ -3,6 +3,7 @@ import os
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
+from docx import Document
 import psycopg
 from pydantic import BaseModel
 from backend.rag import answer_question, embedding_model
@@ -41,6 +42,25 @@ def extract_text_from_pdf(file_path: Path) -> list[dict]:
 
     return pages
 
+def extract_text_from_docx(file_path: Path) -> list[dict]:
+    document = Document(file_path)
+
+    paragraphs = []
+
+    for paragraph in document.paragraphs:
+        text = paragraph.text.strip()
+
+        if text:
+            paragraphs.append(text)
+
+    full_text = "\n".join(paragraphs)
+
+    return [
+        {
+            "page": 1,
+            "text": full_text,
+        }
+    ]
 
 @app.get("/")
 def read_root():
@@ -62,6 +82,9 @@ async def upload_document(file: UploadFile = File(...)):
 
     if file.content_type == "application/pdf":
         pages = extract_text_from_pdf(file_path)
+
+    elif file.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        pages = extract_text_from_docx(file_path)
 
     with psycopg.connect(
         host=os.getenv("DB_HOST"),
