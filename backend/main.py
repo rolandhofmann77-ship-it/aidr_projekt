@@ -12,6 +12,7 @@ app = FastAPI()
 
 class QuestionRequest(BaseModel):
     question: str
+    document_id: int | None = None
 
 app.add_middleware(
     CORSMiddleware,
@@ -308,4 +309,7 @@ def delete_document(document_id: int):
 
 @app.post("/ask")
 def ask_question(request: QuestionRequest):
-    return answer_question(request.question)
+    return answer_question(
+        request.question,
+        request.document_id,
+    )

@@ -8,6 +8,7 @@ function App() {
     { page: number; text: string }[]
   >([])
   const [question, setQuestion] = useState("")
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
   const [answer, setAnswer] = useState("")
   const [sources, setSources] = useState<
     {
@@ -149,6 +150,7 @@ function App() {
           },
           body: JSON.stringify({
             question: question,
+            document_id: selectedDocumentId,
           }),
         }
       )
@@ -236,13 +238,44 @@ function App() {
         <section>
           <h2>Frage an die Dokumente</h2>
 
+          <div>
+            <label htmlFor="document-select">
+              Dokument
+            </label>
+
+            <select
+              id="document-select"
+              value={selectedDocumentId ?? ""}
+              onChange={(event) => {
+                const value = event.target.value
+
+                setSelectedDocumentId(
+                  value === "" ? null : Number(value)
+                )
+              }}
+            >
+              <option value="">
+                Alle Dokumente
+              </option>
+
+              {documents.map((document) => (
+                <option
+                  key={document.id}
+                  value={document.id}
+                >
+                  {document.filename}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <input
             type="text"
             placeholder="Stelle eine Frage zu deinen Dokumenten..."
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
           />
-
+          
           <button onClick={handleAsk}>
             Frage stellen
           </button>
