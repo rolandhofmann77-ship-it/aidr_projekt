@@ -29,4 +29,5 @@ Thumbs.db
 *.log
 
 # Uploaded documents
+uploads/
 backend/uploads/
