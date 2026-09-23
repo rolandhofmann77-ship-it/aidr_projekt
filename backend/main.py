@@ -62,6 +62,89 @@ def extract_text_from_docx(file_path: Path) -> list[dict]:
         }
     ]
 
+def chunk_text(
+    text: str,
+    target_size: int = 1200,
+    max_size: int = 1600,
+    overlap: int = 250,
+) -> list[str]:
+    paragraphs = [
+        paragraph.strip()
+        for paragraph in text.split("\n")
+        if paragraph.strip()
+    ]
+
+    chunks = []
+    current_chunk = ""
+
+    def split_into_sentences(paragraph: str) -> list[str]:
+        sentences = []
+        current_sentence = ""
+
+        for character in paragraph:
+            current_sentence += character
+
+            if character in ".!?":
+                sentence = current_sentence.strip()
+
+                if sentence:
+                    sentences.append(sentence)
+
+                current_sentence = ""
+
+        if current_sentence.strip():
+            sentences.append(current_sentence.strip())
+
+        return sentences
+
+    def create_overlap(sentences: list[str]) -> str:
+        overlap_sentences = []
+        current_length = 0
+
+        for sentence in reversed(sentences):
+            sentence_length = len(sentence)
+
+            if current_length + sentence_length > overlap:
+                break
+
+            overlap_sentences.insert(0, sentence)
+            current_length += sentence_length
+
+        return " ".join(overlap_sentences)
+
+    for paragraph in paragraphs:
+        sentences = split_into_sentences(paragraph)
+
+        for sentence in sentences:
+            if not current_chunk:
+                current_chunk = sentence
+                continue
+
+            candidate = f"{current_chunk} {sentence}"
+
+            if len(candidate) <= target_size:
+                current_chunk = candidate
+                continue
+
+            chunks.append(current_chunk)
+
+            overlap_text = create_overlap(
+                split_into_sentences(current_chunk)
+            )
+
+            if overlap_text:
+                current_chunk = f"{overlap_text} {sentence}"
+            else:
+                current_chunk = sentence
+
+            if len(current_chunk) > max_size:
+                current_chunk = sentence
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
+
 @app.get("/")
 def read_root():
     return {"message": "AIDR Backend läuft!"}
@@ -86,6 +169,12 @@ async def upload_document(file: UploadFile = File(...)):
     elif file.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         pages = extract_text_from_docx(file_path)
 
+    else:
+        return {
+            "message": "Dateiformat wird nicht unterstützt.",
+            "filename": file.filename,
+        }
+
     with psycopg.connect(
         host=os.getenv("DB_HOST"),
         port=os.getenv("DB_PORT"),
@@ -105,30 +194,37 @@ async def upload_document(file: UploadFile = File(...)):
 
             document_id = cursor.fetchone()[0]
 
+            chunk_index = 0
+
             for page in pages:
                 page_text = page["text"]
 
-                embedding = embedding_model.encode(page_text).tolist()
+                chunks = chunk_text(page_text)
 
-                cursor.execute(
-                    """
-                    INSERT INTO document_chunks (
-                        document_id,
-                        chunk_index,
-                        content,
-                        page_number,
-                        embedding
+                for chunk in chunks:
+                    embedding = embedding_model.encode(chunk).tolist()
+
+                    cursor.execute(
+                        """
+                        INSERT INTO document_chunks (
+                            document_id,
+                            chunk_index,
+                            content,
+                            page_number,
+                            embedding
+                        )
+                        VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (
+                            document_id,
+                            chunk_index,
+                            chunk,
+                            page["page"],
+                            embedding,
+                        ),
                     )
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (
-                        document_id,
-                        page["page"] - 1,
-                        page_text,
-                        page["page"],
-                        embedding,
-                    ),
-                )
+
+                    chunk_index += 1
 
         connection.commit()
 
@@ -138,6 +234,7 @@ async def upload_document(file: UploadFile = File(...)):
         "content_type": file.content_type,
         "size": len(content),
         "pages": pages,
+        "chunks": chunk_index,
     }
 
 @app.get("/documents")

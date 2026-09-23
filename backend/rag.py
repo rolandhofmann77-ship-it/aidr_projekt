@@ -43,14 +43,17 @@ def answer_question(question: str) -> dict:
             cursor.execute(
                 """
                 SELECT
-                    id,
-                    document_id,
-                    page_number,
-                    content,
-                    embedding <=> %s::vector AS distance
+                    document_chunks.id,
+                    document_chunks.document_id,
+                    documents.filename,
+                    document_chunks.page_number,
+                    document_chunks.content,
+                    document_chunks.embedding <=> %s::vector AS distance
                 FROM document_chunks
-                WHERE embedding IS NOT NULL
-                ORDER BY embedding <=> %s::vector
+                JOIN documents
+                    ON documents.id = document_chunks.document_id
+                WHERE document_chunks.embedding IS NOT NULL
+                ORDER BY document_chunks.embedding <=> %s::vector
                 LIMIT 3
                 """,
                 (question_embedding, question_embedding),
@@ -62,14 +65,15 @@ def answer_question(question: str) -> dict:
 
     sources = []
 
-    for chunk_id, document_id, page_number, content, distance in results:
+    for chunk_id, document_id, filename, page_number, content, distance in results:
         context_parts.append(
-            f"[Dokument {document_id}, Seite {page_number}]\n{content}"
+            f"[Datei: {filename}, Seite {page_number}]\n{content}"
         )
 
         sources.append(
             {
                 "document_id": document_id,
+                "filename": filename,
                 "page": page_number,
                 "distance": distance,
             }

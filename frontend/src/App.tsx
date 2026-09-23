@@ -10,7 +10,12 @@ function App() {
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
   const [sources, setSources] = useState<
-    { document_id: number; page: number; distance: number }[]
+    {
+      document_id: number
+      filename: string
+      page: number
+      distance: number
+    }[]
   >([])
   const [documents, setDocuments] = useState<
     {
@@ -84,6 +89,18 @@ function App() {
       const data = await response.json()
 
       setExtractedPages(data.pages ?? [])
+
+      const documentsResponse = await fetch(
+        "http://127.0.0.1:8000/documents"
+      )
+
+      if (!documentsResponse.ok) {
+        throw new Error("Dokumente konnten nicht aktualisiert werden")
+      }
+
+      const documentsData = await documentsResponse.json()
+
+      setDocuments(documentsData)
 
       setUploadMessage(
         `Upload erfolgreich: ${data.filename} (${data.size} Bytes)`
@@ -242,13 +259,12 @@ function App() {
                 <div>
                   <h3>Quellen</h3>
 
-                  <ul>
-                    {sources.map((source, index) => (
-                      <li key={index}>
-                        Dokument {source.document_id} – Seite {source.page}
-                      </li>
-                    ))}
-                  </ul>
+                  {sources.map((source, index) => (
+                    <div key={index}>
+                      <div>📄 {source.filename}</div>
+                      <div>Seite {source.page}</div>
+                    </div>
+                  ))}
                 </div>
               )}
             </>
