@@ -308,8 +308,44 @@ def delete_document(document_id: int):
         "filename": deleted_document[1],
     }
 
+def document_exists(document_id: int) -> bool:
+    with psycopg.connect(
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+    ) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1
+                FROM documents
+                WHERE id = %s
+                """,
+                (document_id,),
+            )
+
+            return cursor.fetchone() is not None
+
 @app.post("/ask")
 def ask_question(request: QuestionRequest):
+    if not request.question.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Bitte geben Sie eine Frage ein.",
+        )
+
+    if request.document_id is not None:
+        if not document_exists(request.document_id):
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Das Dokument mit der ID "
+                    f"{request.document_id} wurde nicht gefunden."
+                ),
+            )
+
     try:
         return answer_question(
             request.question,

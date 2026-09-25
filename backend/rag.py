@@ -18,7 +18,7 @@ GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
 MAX_GEMINI_RETRIES = 3
 RETRY_DELAYS = [2, 4]
-
+MAX_DISTANCE = 0.50
 
 embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 
@@ -91,6 +91,20 @@ def answer_question(
                 )
 
             results = cursor.fetchall()
+            results = [
+                result
+                for result in results
+                if result[5] <= MAX_DISTANCE
+            ]
+            if not results:
+                return {
+                    "question": question,
+                    "answer": (
+                        "Im bereitgestellten Dokumentkontext wurde kein "
+                        "passender Inhalt zu dieser Frage gefunden."
+                    ),
+                    "sources": [],
+                }
 
     context_parts = []
     sources = []
