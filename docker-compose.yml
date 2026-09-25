@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: aidr
       POSTGRES_USER: aidr
-      POSTGRES_PASSWORD: REDACTED_DEV_DB_PASSWORD
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
