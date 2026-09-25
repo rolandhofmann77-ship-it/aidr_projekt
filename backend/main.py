@@ -159,6 +159,20 @@ def health_check():
 
 @app.post("/documents")
 async def upload_document(file: UploadFile = File(...)):
+    supported_content_types = {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+
+    if file.content_type not in supported_content_types:
+        raise HTTPException(
+            status_code=415,
+            detail=(
+                f"Dateiformat '{file.content_type}' wird nicht unterstützt. "
+                "Erlaubt sind PDF und DOCX."
+            ),
+        )
+
     file_path = UPLOAD_DIR / file.filename
     content = await file.read()
     file_path.write_bytes(content)
@@ -168,14 +182,11 @@ async def upload_document(file: UploadFile = File(...)):
     if file.content_type == "application/pdf":
         pages = extract_text_from_pdf(file_path)
 
-    elif file.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    elif (
+        file.content_type
+        == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ):
         pages = extract_text_from_docx(file_path)
-
-    else:
-        return {
-            "message": "Dateiformat wird nicht unterstützt.",
-            "filename": file.filename,
-        }
 
     with psycopg.connect(
         host=os.getenv("DB_HOST"),
