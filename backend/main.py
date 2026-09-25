@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
 from pypdf.errors import PdfStreamError
 from docx import Document
+from zipfile import BadZipFile
 import psycopg
 from google.genai.errors import ServerError
 from pydantic import BaseModel
@@ -203,6 +204,14 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=400,
             detail="Die hochgeladene PDF-Datei ist beschädigt oder ungültig.",
+        )
+
+    except BadZipFile:
+        file_path.unlink(missing_ok=True)
+
+        raise HTTPException(
+            status_code=400,
+            detail="Die hochgeladene DOCX-Datei ist beschädigt oder ungültig.",
         )
 
     with psycopg.connect(
