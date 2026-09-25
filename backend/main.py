@@ -173,8 +173,15 @@ async def upload_document(file: UploadFile = File(...)):
             ),
         )
 
-    file_path = UPLOAD_DIR / file.filename
     content = await file.read()
+
+    if not content:
+        raise HTTPException(
+            status_code=400,
+            detail="Die hochgeladene Datei ist leer.",
+        )
+
+    file_path = UPLOAD_DIR / file.filename
     file_path.write_bytes(content)
 
     pages = []
