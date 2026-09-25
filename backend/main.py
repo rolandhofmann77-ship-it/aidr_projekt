@@ -3,6 +3,7 @@ import os
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
+from pypdf.errors import PdfStreamError
 from docx import Document
 import psycopg
 from google.genai.errors import ServerError
@@ -186,14 +187,23 @@ async def upload_document(file: UploadFile = File(...)):
 
     pages = []
 
-    if file.content_type == "application/pdf":
-        pages = extract_text_from_pdf(file_path)
+    try:
+        if file.content_type == "application/pdf":
+            pages = extract_text_from_pdf(file_path)
 
-    elif (
-        file.content_type
-        == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ):
-        pages = extract_text_from_docx(file_path)
+        elif (
+            file.content_type
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ):
+            pages = extract_text_from_docx(file_path)
+
+    except PdfStreamError:
+        file_path.unlink(missing_ok=True)
+
+        raise HTTPException(
+            status_code=400,
+            detail="Die hochgeladene PDF-Datei ist beschädigt oder ungültig.",
+        )
 
     with psycopg.connect(
         host=os.getenv("DB_HOST"),
