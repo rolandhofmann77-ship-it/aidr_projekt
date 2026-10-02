@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import uuid
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
@@ -183,7 +184,10 @@ async def upload_document(file: UploadFile = File(...)):
             detail="Die hochgeladene Datei ist leer.",
         )
 
-    file_path = UPLOAD_DIR / file.filename
+    original_filename = Path(file.filename).name
+    storage_filename = f"{uuid.uuid4().hex}_{original_filename}"
+    file_path = UPLOAD_DIR / storage_filename
+
     file_path.write_bytes(content)
 
     pages = []
@@ -224,11 +228,19 @@ async def upload_document(file: UploadFile = File(...)):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO documents (filename, content_type)
-                VALUES (%s, %s)
+                INSERT INTO documents (
+                    filename,
+                    storage_filename,
+                    content_type
+                )
+                VALUES (%s, %s, %s)
                 RETURNING id
                 """,
-                (file.filename, file.content_type),
+                (
+                    original_filename,
+                    storage_filename,
+                    file.content_type,
+                ),
             )
 
             document_id = cursor.fetchone()[0]
@@ -269,7 +281,7 @@ async def upload_document(file: UploadFile = File(...)):
 
     return {
         "document_id": document_id,
-        "filename": file.filename,
+        "filename": original_filename,
         "content_type": file.content_type,
         "size": len(content),
         "pages": pages,
@@ -324,7 +336,7 @@ def delete_document(document_id: int):
                 """
                 DELETE FROM documents
                 WHERE id = %s
-                RETURNING id, filename
+                RETURNING id, filename, storage_filename
                 """,
                 (document_id,),
             )
@@ -334,10 +346,13 @@ def delete_document(document_id: int):
         connection.commit()
 
     if deleted_document is None:
-        return {
-            "message": "Dokument nicht gefunden",
-            "document_id": document_id,
-        }
+        raise HTTPException(
+            status_code=404,
+            detail=f"Das Dokument mit der ID {document_id} wurde nicht gefunden.",
+        )
+
+    file_path = UPLOAD_DIR / deleted_document[2]
+    file_path.unlink(missing_ok=True)
 
     return {
         "message": "Dokument gelöscht",
