@@ -95,6 +95,8 @@ Die benötigten Umgebungsvariablen sind in `.env.example` beschrieben.
 
 Eine lokale `.env`-Datei muss angelegt werden und darf **nicht** in das Repository eingecheckt werden.
 
+`.env.example` nach `.env` kopieren und die benötigten Zugangsdaten eintragen:
+
 Beispiel:
 
 ```env
